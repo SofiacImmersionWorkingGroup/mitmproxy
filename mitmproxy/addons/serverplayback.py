@@ -1,4 +1,5 @@
 import hashlib
+import re
 import typing
 import urllib
 
@@ -54,6 +55,13 @@ class ServerPlayback:
             """
             Request's parameters to be ignored while searching for a saved flow
             to replay.
+            """
+        )
+        loader.add_option(
+            "server_replay_ignore_params_regex", str, "\d{13,13}",
+            """
+            Regex to ignore a request parameter while searching for a saved
+            flow to replay
             """
         )
         loader.add_option(
@@ -134,6 +142,7 @@ class ServerPlayback:
                     if k not in ctx.options.server_replay_ignore_payload_params
                 )
             else:
+                r.raw_content = re.sub(',"dateTime":"(.+?)"', '', '{}'.format(r.raw_content))
                 key.append(str(r.raw_content))
 
         if not ctx.options.server_replay_ignore_host:
@@ -143,12 +152,18 @@ class ServerPlayback:
 
         filtered = []
         ignore_params = ctx.options.server_replay_ignore_params or []
+        if ignore_params:
+            ignore_params = ignore_params[0].split(' ')
+
+        ignore_params_regex = ctx.options.server_replay_ignore_params_regex
+
         for p in queriesArray:
             if p[0] not in ignore_params:
                 filtered.append(p)
         for p in filtered:
-            key.append(p[0])
-            key.append(p[1])
+            if ignore_params_regex and not re.compile(ignore_params_regex).match(p[0]):
+                key.append(p[0])
+                key.append(p[1])
 
         if ctx.options.server_replay_use_headers:
             headers = []
